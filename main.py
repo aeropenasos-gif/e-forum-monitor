@@ -117,8 +117,15 @@ def main() -> int:
     recent_matches_path = run_cfg.get("recent_matches_file", "state/recent_matches.json")
     recent_matches_keep_hours = float(run_cfg.get("recent_matches_keep_hours", 48))
 
-    chat_id = (config.get("recipients", {}).get("telegram", {}) or {}).get("chat_id")
-    email_to = (config.get("recipients", {}).get("email", {}) or {}).get("to", [])
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID") or (
+        config.get("recipients", {}).get("telegram", {}) or {}
+    ).get("chat_id")
+
+    email_to_env = os.environ.get("EMAIL_TO")
+    if email_to_env:
+        email_to = [addr.strip() for addr in email_to_env.split(",") if addr.strip()]
+    else:
+        email_to = (config.get("recipients", {}).get("email", {}) or {}).get("to", [])
 
     all_email_batch = []
     all_log_entries = []
