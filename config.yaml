@@ -1,0 +1,173 @@
+# =====================================================================
+#  Eligna Forum Monitor — конфигурация
+#  Редактирай само този файл, за да променяш ключови думи, форуми,
+#  получатели на съобщения и настройки. Не е нужно да пипаш Python код.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# КЪДЕ ДА СЕ ИЗПРАЩАТ СЪОБЩЕНИЯТА
+# ---------------------------------------------------------------------
+recipients:
+  telegram:
+    # Chat ID на човека/канала, който ще получава съобщенията.
+    # Виж README.md -> "Настройка на Telegram" как да го намериш.
+    # Самият bot token НЕ се пише тук — той е таен и се пази като
+    # GitHub Secret с име TELEGRAM_BOT_TOKEN.
+    chat_id: "PUT_YOUR_TELEGRAM_CHAT_ID_HERE"
+
+  email:
+    to:
+      - "aeropenasos@gmail.com"
+    # Можеш да добавиш още адреси тук, всеки на нов ред с "- ":
+    # - "vtor_email@example.com"
+
+# ---------------------------------------------------------------------
+# REDDIT — следи се чрез официалното Reddit API (напълно позволено)
+# ---------------------------------------------------------------------
+reddit:
+  enabled: true
+  subreddits:
+    - roommates
+    - SingleAndHappy
+    - livingtogether
+    - ADHD
+    - flatshare
+    - padsplit
+    - bostonhousing
+    - CleaningTips
+    - HousingUK
+    - LondonHousing
+    - AskUK
+  # Колко от най-новите коментари/постове да се проверяват на всеки цикъл.
+  fetch_limit: 100
+  # Дали да се следят и нови постове (не само коментари).
+  include_submissions: true
+
+# ---------------------------------------------------------------------
+# MUMSNET и THE STUDENT ROOM — "best effort" мониторинг.
+# Нямат публично API, затова се използва търсене през DuckDuckGo
+# (site:domain "фраза"), защото директните им search-страници са
+# силно динамични (JavaScript) и нестабилни за просто "четене" на HTML.
+# Това означава: възможно е забавяне от няколко часа спрямо реалния
+# момент на публикуване (докато DuckDuckGo индексира страницата), и
+# резултатите може да пропуснат нещо. Виж README.md за детайли.
+#
+# NEXTDOOR умишлено НЕ е включен — изисква верифициран акаунт за
+# конкретен квартал и има силна анти-бот защита; автоматизация там
+# може да наруши условията за ползване на платформата.
+# ---------------------------------------------------------------------
+site_search:
+  mumsnet:
+    enabled: true
+    label: "Mumsnet"
+    domain: "mumsnet.com/talk"
+  studentroom:
+    enabled: true
+    label: "The Student Room"
+    domain: "thestudentroom.co.uk"
+  nextdoor:
+    enabled: false
+    label: "Nextdoor"
+    domain: "nextdoor.com"
+    note: "Изключено умишлено — виж README.md, раздел 'Ограничения'."
+  # Колко ключови фрази да се групират в една заявка към DuckDuckGo
+  # (за да не се правят десетки отделни заявки на всеки цикъл).
+  batch_size: 8
+  # Пауза (в секунди) между заявките, за да не се претоварва DuckDuckGo.
+  delay_between_requests: 1.5
+
+# ---------------------------------------------------------------------
+# КЛЮЧОВИ ДУМИ И АСОЦИАЦИИ
+# Всичко се сравнява без значение на големи/малки букви.
+# Можеш свободно да добавяш/трият редове тук — не е нужна промяна в код.
+# ---------------------------------------------------------------------
+keywords:
+  phrases:
+    - "Family Organizer"
+    - "Family Assistant"
+    - "home organizer"
+    - "Family AI"
+    - "to do list"
+    - "to do notes"
+    - "Household Organizer"
+    - "Shared Family Calendar"
+    - "Shared Family organizer"
+    - "Organize Family Routines"
+    - "Household Assistant"
+    - "Family Hub"
+    - "shared tasks"
+    - "shared calendar"
+    - "shared household organizer"
+    - "family app"
+    - "family calendar"
+    - "weekly shopping"
+    - "online family organiser"
+    - "diary app"
+    - "calendar sharing app"
+    - "family calendar apps"
+    - "shopping list"
+
+  # "Интелигентно търсене на асоциации" = групи от английски идиоми/фрази,
+  # които обикновено се използват, когато хората говорят за темите по-долу,
+  # дори без да споменават директно горните ключови фрази.
+  idiom_associations:
+    cognitive_and_mental_load:
+      - "mental load"
+      - "cognitive load of running a household"
+      - "invisible labor"
+      - "invisible workload"
+      - "the one who remembers everything"
+      - "default parent"
+      - "keeping track of everything at home"
+      - "second shift"
+      - "emotional labor at home"
+    routine_and_task_organizing:
+      - "keeping track of chores"
+      - "organizing household tasks"
+      - "chore chart"
+      - "who does what at home"
+      - "splitting the chores"
+      - "fair split of housework"
+      - "dividing responsibilities at home"
+      - "household task list"
+    shared_expenses:
+      - "splitting bills"
+      - "splitting rent"
+      - "shared grocery list"
+      - "utility bills split"
+      - "who owes what"
+    automation_and_reminders:
+      - "shared calendar app"
+      - "automatic reminders for chores"
+      - "smart to-do list"
+      - "app that reminds you"
+
+matching:
+  case_sensitive: false
+
+# ---------------------------------------------------------------------
+# СЪСТОЯНИЕ (за да не се изпраща едно и също съобщение два пъти)
+# ---------------------------------------------------------------------
+run:
+  state_dir: "state"
+  reddit_seen_file: "state/seen_reddit.json"
+  site_search_seen_file: "state/seen_site_search.json"
+  max_seen_ids_per_source: 5000
+  # За таблото (dashboard.py) — виж раздел "Табло за преглед" в README.md.
+  recent_matches_file: "state/recent_matches.json"
+  recent_matches_keep_hours: 48
+
+# ---------------------------------------------------------------------
+# ТАБЛО ЗА ПРЕГЛЕД (dashboard.py) — ръчно пускан преглед на последните
+# 24 часа релевантни нишки, подредени по сила на съвпадение. НЕ пише
+# и НЕ публикува нищо никъде — само показва и линкова. Черновите на
+# отговори се правят отделно, в чат със skill "reddit-uk-translator".
+# ---------------------------------------------------------------------
+dashboard:
+  window_hours: 24
+  output_file: "dashboard.html"
+  # Тегла за изчисляване на "сила на съвпадение" (relevance score).
+  score_weights:
+    per_keyword_match: 1.0
+    per_idiom_match: 1.5
+    recency_bonus_max: 2.0
