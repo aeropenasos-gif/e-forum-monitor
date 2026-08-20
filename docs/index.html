@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>E Forum Monitor — Табло за преглед</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --border:         rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --border:         rgba(255,255,255,0.10);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-plane);
+    color: var(--text-primary);
+  }
+  .viz-root {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0 0 24px; }
+
+  .callout {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .callout strong { color: var(--text-primary); }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-tile .value {
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-tile .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    background: var(--dot-light);
+  }
+  @media (prefers-color-scheme: dark) {
+    .legend-dot { background: var(--dot-dark); }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--gridline);
+    vertical-align: top;
+    color: var(--text-primary);
+  }
+  tr:last-child td { border-bottom: none; }
+  .col-rank { color: var(--text-muted); font-variant-numeric: tabular-nums; width: 28px; }
+  .col-time { color: var(--text-secondary); white-space: nowrap; }
+  .col-snippet { max-width: 420px; color: var(--text-secondary); }
+  .empty-state { text-align: center; color: var(--text-muted); padding: 32px; }
+
+  mark {
+    background: #cde2fb;
+    color: #0b0b0b;
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+  @media (prefers-color-scheme: dark) {
+    mark { background: #184f95; color: #ffffff; }
+  }
+
+  .chip {
+    display: inline-block;
+    font-size: 11px;
+    background: var(--page-plane);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin: 2px 4px 2px 0;
+    white-space: nowrap;
+  }
+
+  .score-badge {
+    display: inline-block;
+    min-width: 32px;
+    text-align: center;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    border-radius: 6px;
+    padding: 3px 8px;
+    background: var(--step-light);
+    color: var(--step-text-light);
+  }
+  @media (prefers-color-scheme: dark) {
+    .score-badge { background: var(--step-dark); color: var(--step-text-dark); }
+  }
+
+  .source-tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: #ffffff;
+    background: var(--src-light);
+  }
+  @media (prefers-color-scheme: dark) {
+    .source-tag { background: var(--src-dark); }
+  }
+
+  .open-link {
+    color: #2a78d6;
+    text-decoration: none;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  @media (prefers-color-scheme: dark) {
+    .open-link { color: #3987e5; }
+  }
+
+  footer {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <h1>E Forum Monitor — Табло за преглед</h1>
+  <p class="subtitle">
+    Последните 24 часа · генерирано на 2026-08-20 19:19 ·
+    0 релевантни нишки
+  </p>
+
+  <div class="callout">
+    <strong>Как да ползваш това табло:</strong> избери нишка от списъка,
+    отвори линка за контекст, после занеси линка + откъса в чат с Claude
+    (skill „reddit-uk-translator“), за да получиш чернова на отговор на
+    английски + превод на български за проверка. <strong>Таблото не пише
+    и не публикува нищо</strong> — финалната редакция и публикуването
+    остават изцяло твое ръчно действие, с твоя собствена преценка.
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-tile">
+      <div class="value">0</div>
+      <div class="label">Общо релевантни нишки</div>
+    </div>
+    <div class="stat-tile">
+      <div class="value">0</div>
+      <div class="label">От Reddit</div>
+    </div>
+    <div class="stat-tile">
+      <div class="value">0</div>
+      <div class="label">От Mumsnet / The Student Room</div>
+    </div>
+    <div class="stat-tile">
+      <div class="value">0</div>
+      <div class="label">С приблизително време (* виж по-долу)</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="legend-dot" style="--dot-light:#2a78d6; --dot-dark:#3987e5;"></span>Reddit</span>
+    <span><span class="legend-dot" style="--dot-light:#eb6834; --dot-dark:#d95926;"></span>Mumsnet / The Student Room</span>
+    <span>* = приблизително време (виж README.md, раздел "Ограничения")</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Сила</th>
+        <th>Източник</th>
+        <th>Кога</th>
+        <th>Съвпадения</th>
+        <th>Откъс</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="7" class="empty-state">Няма релевантни съвпадения в избрания прозорец. Пусни GitHub Actions run-а (или изчакай следващия цикъл) и опитай отново.</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    Генерирано локално от dashboard.py — нищо от тук не се изпраща никъде автоматично.
+  </footer>
+</div>
+</body>
+</html>
