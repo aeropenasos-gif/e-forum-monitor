@@ -13,7 +13,7 @@ recipients:
     # Виж README.md -> "Настройка на Telegram" как да го намериш.
     # Самият bot token НЕ се пише тук — той е таен и се пази като
     # GitHub Secret с име TELEGRAM_BOT_TOKEN.
-    chat_id: "PUT_YOUR_TELEGRAM_CHAT_ID_HERE"
+    chat_id: 6637151958
 
   email:
     to:
