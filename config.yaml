@@ -165,7 +165,7 @@ run:
 # ---------------------------------------------------------------------
 dashboard:
   window_hours: 24
-  output_file: "dashboard.html"
+  output_file: "docs/index.html"
   # Тегла за изчисляване на "сила на съвпадение" (relevance score).
   score_weights:
     per_keyword_match: 1.0
