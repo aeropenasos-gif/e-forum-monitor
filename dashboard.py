@@ -176,7 +176,7 @@ def render_html(entries_with_scores: list, window_hours: float, generated_at: fl
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Eligna Forum Monitor — Табло за преглед</title>
+<title>E Forum Monitor — Табло за преглед</title>
 <style>
   :root {{
     color-scheme: light;
@@ -369,7 +369,7 @@ def render_html(entries_with_scores: list, window_hours: float, generated_at: fl
 </head>
 <body>
 <div class="viz-root">
-  <h1>Eligna Forum Monitor — Табло за преглед</h1>
+  <h1>E Forum Monitor — Табло за преглед</h1>
   <p class="subtitle">
     Последните {window_hours:g} часа · генерирано на {generated_str} ·
     {total} релевантни нишки
@@ -468,7 +468,7 @@ def main() -> int:
 
     if "--no-open" not in sys.argv:
         try:
-            webbrowser.open(f"file://{__import__('os').path.abspath(output_file)}")
+            webbrowser.open(f"file://{os.path.abspath(output_file)}")
         except Exception as exc:  # noqa: BLE001
             print(f"[dashboard] Не успях да отворя браузъра автоматично: {exc}")
 
