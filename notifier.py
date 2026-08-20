@@ -86,7 +86,7 @@ def send_email_digest(matched_items_with_matches, to_addresses) -> bool:
 
     body = "\n".join(lines)
     msg = MIMEText(body, _charset="utf-8")
-    msg["Subject"] = f"Eligna Forum Monitor — {len(matched_items_with_matches)} нови съвпадения"
+    msg["Subject"] = f"E Forum Monitor — {len(matched_items_with_matches)} нови съвпадения"
     msg["From"] = email_from
     msg["To"] = ", ".join(to_addresses)
 
