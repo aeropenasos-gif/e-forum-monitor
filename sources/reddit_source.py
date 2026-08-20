@@ -22,7 +22,7 @@ import praw
 def _build_reddit_client():
     client_id = os.environ.get("REDDIT_CLIENT_ID")
     client_secret = os.environ.get("REDDIT_CLIENT_SECRET")
-    user_agent = os.environ.get("REDDIT_USER_AGENT") or "eligna-forum-monitor/1.0"
+    user_agent = os.environ.get("REDDIT_USER_AGENT") or "e-forum-monitor/1.0"
 
     if not client_id or not client_secret:
         raise RuntimeError(
