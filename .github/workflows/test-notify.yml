@@ -1,0 +1,42 @@
+name: Test notifications
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests pyyaml
+
+      - name: Test Telegram + Email
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+        run: |
+          python3 - <<'EOF'
+          import sys
+          sys.path.insert(0, ".")
+          import yaml
+          from notifier import send_telegram, send_email_digest
+
+          config = yaml.safe_load(open("config.yaml", encoding="utf-8"))
+          chat_id = config["recipients"]["telegram"]["chat_id"]
+          email_to = config["recipients"]["email"]["to"]
+
+          ok_tg = send_telegram("Тест: Eligna Forum Monitor е свързан правилно с Telegram.", chat_id=chat_id)
+          print("Telegram изпратен:", ok_tg)
+
+          fake_item = {"source_label": "Тест", "url": "https://example.com"}
+          fake_matches = [{"category": "keyword", "phrase": "тестова фраза"}]
+          ok_email = send_email_digest([(fake_item, fake_matches)], email_to)
+          print("Email изпратен:", ok_email)
+          EOF
