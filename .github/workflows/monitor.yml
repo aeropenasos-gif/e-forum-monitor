@@ -1,8 +1,14 @@
-name: Eligna Forum Monitor
+name: E Forum Monitor
 
 on:
   schedule:
+    # На всеки 20 минути. Ако repo-то е ЧАСТНО (private), виж README.md
+    # за препоръка да го смениш на 30 минути, за да останеш в
+    # безплатните минути на GitHub Actions. Ако repo-то е ПУБЛИЧНО
+    # (public), тази честота е напълно безплатна без ограничение.
     - cron: "*/20 * * * *"
+  # Позволява ръчно стартиране от таб "Actions" в GitHub с бутона
+  # "Run workflow" — полезно за тест.
   workflow_dispatch: {}
 
 permissions:
@@ -30,13 +36,13 @@ jobs:
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}        
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}        
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: python main.py
 
       - name: Generate dashboard (docs/index.html за GitHub Pages)
@@ -44,7 +50,7 @@ jobs:
 
       - name: Commit updated state + dashboard
         run: |
-          git config user.name "eligna-monitor-bot"
+          git config user.name "e-monitor-bot"
           git config user.email "actions@users.noreply.github.com"
           git add state/ docs/
           if ! git diff --cached --quiet; then
