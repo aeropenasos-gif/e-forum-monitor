@@ -2,13 +2,7 @@ name: Eligna Forum Monitor
 
 on:
   schedule:
-    # На всеки 20 минути. Ако repo-то е ЧАСТНО (private), виж README.md
-    # за препоръка да го смениш на 30 минути, за да останеш в
-    # безплатните минути на GitHub Actions. Ако repo-то е ПУБЛИЧНО
-    # (public), тази честота е напълно безплатна без ограничение.
     - cron: "*/20 * * * *"
-  # Позволява ръчно стартиране от таб "Actions" в GitHub с бутона
-  # "Run workflow" — полезно за тест.
   workflow_dispatch: {}
 
 permissions:
@@ -43,14 +37,17 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
         run: python main.py
 
-      - name: Commit updated state
+      - name: Generate dashboard (docs/index.html за GitHub Pages)
+        run: python dashboard.py --no-open
+
+      - name: Commit updated state + dashboard
         run: |
           git config user.name "eligna-monitor-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add state/
+          git add state/ docs/
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update seen-state [skip ci]"
+            git commit -m "chore: update seen-state + dashboard [skip ci]"
             git push
           else
-            echo "Няма промяна в state/ — нищо за commit."
+            echo "Няма промяна в state/ или docs/ — нищо за commit."
           fi
