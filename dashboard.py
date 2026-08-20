@@ -22,6 +22,7 @@ dashboard.py
 """
 
 import html
+import os
 import sys
 import time
 import webbrowser
@@ -457,6 +458,9 @@ def main() -> int:
     scored.sort(key=lambda pair: pair[1], reverse=True)
 
     html_content = render_html(scored, window_hours, now)
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(html_content)
 
