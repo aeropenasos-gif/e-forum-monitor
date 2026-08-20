@@ -24,8 +24,8 @@ from bs4 import BeautifulSoup
 DUCKDUCKGO_HTML_URL = "https://html.duckduckgo.com/html/"
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (compatible; ElignaForumMonitor/1.0; "
-        "+https://eligna.app)"
+        "Mozilla/5.0 (compatible; EForumMonitor/1.0; "
+        "+https://github.com/aeropenasos-gif/e-forum-monitor)"
     )
 }
 
