@@ -17,6 +17,7 @@ site_search_source.py
     приблизителен, но полезен "best effort" сигнал.
 """
 
+import random
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -110,7 +111,25 @@ def fetch_new_items(site_search_cfg: dict, search_terms):
         return
 
     batch_size = int(site_search_cfg.get("batch_size", 8))
-    delay = float(site_search_cfg.get("delay_between_requests", 1.5))
+
+    # 21.08.2026: DEBUG логовете потвърдиха диагнозата — DuckDuckGo пуска
+    # ПЪРВАТА заявка към даден домейн в цикъла с реални резултати, а на
+    # всяка следваща (към същия домейн) отговаря с интерстициалната си
+    # страница "Protection. Privacy. Peace of mind." вместо резултати.
+    # Старата пауза от 1.5 сек между заявките очевидно не е достатъчна.
+    # Затова минимумът/максимумът вече са конфигурируеми и много по-големи
+    # по подразбиране, с произволна пауза (jitter) между тях, за да не
+    # приличаме на автоматизиран скрейпър с фиксиран ритъм.
+    delay_min = site_search_cfg.get("delay_between_requests_min")
+    delay_max = site_search_cfg.get("delay_between_requests_max")
+    if delay_min is None or delay_max is None:
+        # Обратна съвместимост със стария единичен ключ, ако някой все
+        # още го е задал в config.yaml.
+        legacy_delay = float(site_search_cfg.get("delay_between_requests", 15.0))
+        delay_min = legacy_delay
+        delay_max = legacy_delay
+    delay_min = float(delay_min)
+    delay_max = float(delay_max)
 
     sites = {
         key: value
@@ -143,4 +162,4 @@ def fetch_new_items(site_search_cfg: dict, search_terms):
                     "created_at_is_approximate": True,
                 }
 
-            time.sleep(delay)
+            time.sleep(random.uniform(delay_min, delay_max))
