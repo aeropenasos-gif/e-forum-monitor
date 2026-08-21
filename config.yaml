@@ -206,6 +206,23 @@ keywords:
       - "free trial ran out"
       - "cancelled my subscription because"
 
+    # НОВА ГРУПА (21.08.2026): проблемът с "buy-in" от втория партньор —
+    # взето от реален Reddit трен (r/ProductivityHQ). Множество коментари
+    # показват общ модел: приложението "умира", защото един от двамата
+    # партньори спира да го ползва — независимо кое приложение е. Различно
+    # от feature-базираните групи по-горе — тук сигналът е за адопция/
+    # навик, не за функционалност. Виж Content-idei-i-izvodi-consumer-voice.md,
+    # Съдържателен стълб 7.
+    partner_buy_in_and_adoption:
+      - "one of us stopped using it"
+      - "my partner won't use"
+      - "convince my partner to use"
+      - "only i use the app"
+      - "he never opened the app"
+      - "she never opened the app"
+      - "we both need to use it"
+      - "get my partner on board"
+
 matching:
   case_sensitive: false
 
