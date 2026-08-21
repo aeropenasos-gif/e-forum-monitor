@@ -1,0 +1,240 @@
+# =====================================================================
+#  E Forum Monitor — конфигурация
+#  Редактирай само този файл, за да променяш ключови думи, форуми,
+#  получатели на съобщения и настройки. Не е нужно да пипаш Python код.
+# =====================================================================
+
+# ---------------------------------------------------------------------
+# КЪДЕ ДА СЕ ИЗПРАЩАТ СЪОБЩЕНИЯТА
+# ---------------------------------------------------------------------
+recipients:
+  # ВНИМАНИЕ: repo-то е публично (нужно за GitHub Pages), затова истинският
+  # Telegram chat_id и e-mail адрес(и) вече НЕ се пишат тук — за да не се
+  # виждат от всеки, който отвори repo-то. Вместо това се задават като
+  # GitHub Secrets:
+  #   TELEGRAM_CHAT_ID  -> твоят Telegram chat_id
+  #   EMAIL_TO          -> един или няколко имейла, разделени със запетая
+  #                        (напр. "email1@example.com,email2@example.com")
+  # Виж README.md -> "GitHub Secrets" за точните стъпки.
+  #
+  # Тези редове по-долу са само fallback за локално тестване без Secrets —
+  # НЕ пиши тук истинския си имейл/chat_id, ако repo-то е публично.
+  telegram:
+    chat_id: ""
+  email:
+    to: []
+
+# ---------------------------------------------------------------------
+# REDDIT — следи се чрез официалното Reddit API (напълно позволено)
+# ---------------------------------------------------------------------
+reddit:
+  enabled: true
+  subreddits:
+    - roommates
+    - SingleAndHappy
+    - livingtogether
+    - ADHD
+    - flatshare
+    - padsplit
+    - bostonhousing
+    - CleaningTips
+    - HousingUK
+    - LondonHousing
+    - AskUK
+  # Колко от най-новите коментари/постове да се проверяват на всеки цикъл.
+  fetch_limit: 100
+  # Дали да се следят и нови постове (не само коментари).
+  include_submissions: true
+
+# ---------------------------------------------------------------------
+# MUMSNET и THE STUDENT ROOM — "best effort" мониторинг.
+# Нямат публично API, затова се използва търсене през DuckDuckGo
+# (site:domain "фраза"), защото директните им search-страници са
+# силно динамични (JavaScript) и нестабилни за просто "четене" на HTML.
+# Това означава: възможно е забавяне от няколко часа спрямо реалния
+# момент на публикуване (докато DuckDuckGo индексира страницата), и
+# резултатите може да пропуснат нещо. Виж README.md за детайли.
+#
+# NEXTDOOR умишлено НЕ е включен — изисква верифициран акаунт за
+# конкретен квартал и има силна анти-бот защита; автоматизация там
+# може да наруши условията за ползване на платформата.
+# ---------------------------------------------------------------------
+site_search:
+  mumsnet:
+    enabled: true
+    label: "Mumsnet"
+    domain: "mumsnet.com/talk"
+  studentroom:
+    enabled: true
+    label: "The Student Room"
+    domain: "thestudentroom.co.uk"
+  nextdoor:
+    enabled: false
+    label: "Nextdoor"
+    domain: "nextdoor.com"
+    note: "Изключено умишлено — виж README.md, раздел 'Ограничения'."
+  # Колко ключови фрази да се групират в една заявка към DuckDuckGo
+  # (за да не се правят десетки отделни заявки на всеки цикъл).
+  # ПРОМЯНА (21.08.2026): вдигнато от 8 на 20, защото новите естествени
+  # фрази почти удвоиха общия брой ключови изрази (~40 -> ~71) — с по-голям
+  # batch_size броят HTTP заявки на цикъл остава подобен на преди, вместо
+  # да нарасне, което би увеличило риска от rate-limit блокиране точно
+  # докато диагностицираме проблема с DuckDuckGo.
+  batch_size: 20
+  # Пауза (в секунди) между заявките, за да не се претоварва DuckDuckGo.
+  delay_between_requests: 1.5
+
+# ---------------------------------------------------------------------
+# КЛЮЧОВИ ДУМИ И АСОЦИАЦИИ
+# Всичко се сравнява без значение на големи/малки букви.
+# Можеш свободно да добавяш/трият редове тук — не е нужна промяна в код.
+# ---------------------------------------------------------------------
+keywords:
+  # ПРОМЯНА (виж бележка от Claude, 21.08.2026): орязан е списъкът с
+  # твърде формални/"брандирани" фрази, които рядко се появяват буквално
+  # в разговорен текст (напр. "Shared Family organizer", "Organize Family
+  # Routines" бяха премахнати) — заместени са с естествени изрази по-долу,
+  # за да не се увеличава общият брой заявки към DuckDuckGo без нужда
+  # (всяка допълнителна фраза = допълнителна заявка = по-висок риск от
+  # rate-limit блокиране, виж диагностиката в site_search_source.py).
+  phrases:
+    - "Family Organizer"
+    - "Family Assistant"
+    - "home organizer"
+    - "Household Organizer"
+    - "Household Assistant"
+    - "Family Hub"
+    - "shared tasks"
+    - "shared calendar"
+    - "family app"
+    - "family calendar"
+    - "online family organiser"
+    - "diary app"
+    - "calendar sharing app"
+    - "shopping list"
+
+  # "Интелигентно търсене на асоциации" = групи от английски идиоми/фрази,
+  # които обикновено се използват, когато хората говорят за темите по-долу,
+  # дори без да споменават директно горните ключови фрази.
+  idiom_associations:
+    cognitive_and_mental_load:
+      - "mental load"
+      - "cognitive load of running a household"
+      - "invisible labor"
+      - "invisible workload"
+      - "the one who remembers everything"
+      - "default parent"
+      - "keeping track of everything at home"
+      - "second shift"
+      - "emotional labor at home"
+    routine_and_task_organizing:
+      - "keeping track of chores"
+      - "organizing household tasks"
+      - "chore chart"
+      - "who does what at home"
+      - "splitting the chores"
+      - "fair split of housework"
+      - "dividing responsibilities at home"
+      - "household task list"
+    shared_expenses:
+      - "splitting bills"
+      - "splitting rent"
+      - "shared grocery list"
+      - "utility bills split"
+      - "who owes what"
+    automation_and_reminders:
+      - "shared calendar app"
+      - "automatic reminders for chores"
+      - "smart to-do list"
+      - "app that reminds you"
+
+    # НОВА ГРУПА (21.08.2026): естествени фрази, които хората пишат, когато
+    # ТЪРСЯТ приложение — по-вероятни за буквално съвпадение от формални
+    # категорийни имена. Потвърдено с реален пример от Reddit (r/ProductivityHQ,
+    # "Best family calendar app that handles school schedules?").
+    app_recommendation_requests:
+      - "what's everyone using for"
+      - "any recommendations for a family calendar"
+      - "does anyone use an app for"
+      - "looking for an app that"
+      - "is there an app that reminds"
+      - "what do you use to keep track of"
+      - "best app for family calendar"
+      - "family calendar recs"
+
+    # НОВА ГРУПА (21.08.2026): реални фрази за изоставяне/фрустрация от
+    # съществуващи приложения — много високо-стойностен сигнал (директно
+    # показва болка, не само намерение за търсене). Взети от реален
+    # Reddit коментар: "The cozi thing dying because one of you stopped
+    # using it is literally every couple ever" и подобни.
+    app_abandonment_and_frustration:
+      - "stopped using it"
+      - "never opened it again"
+      - "downloaded so many apps"
+      - "tried like three different apps"
+      - "got cluttered fast"
+      - "nobody actually uses it"
+
+    # НОВА ГРУПА (21.08.2026): специфични за съквартиранти/споделено жилище
+    # фрази — пряко покриват вече следените subreddit-и (roommates, flatshare,
+    # livingtogether, padsplit, HousingUK, LondonHousing) с по-естествен език
+    # от общите "Family..." фрази, които рядко пасват на тази аудитория.
+    roommate_and_shared_housing:
+      - "splitting chores with roommates"
+      - "chore wheel"
+      - "whose turn is it to clean"
+      - "roommate agreement"
+      - "splitting rent and bills"
+      - "utilities split roommates"
+      - "chore chart for roommates"
+
+    # НОВА ГРУПА (21.08.2026): очаквания за AI/автоматизация — пряко
+    # относими към AI позиционирането на Eligna.
+    ai_and_automation_expectation:
+      - "app that reads your email"
+      - "scan the receipt and add it"
+      - "forward the email and it adds"
+      - "automatically add to calendar"
+      - "why do I have to manually add"
+
+    # НОВА ГРУПА (21.08.2026): ценова еластичност/paywall недоволство —
+    # директно от находките в Consumer Voice доклада (Раздел 8).
+    pricing_and_paywall_natural:
+      - "used to be free and now"
+      - "started charging for"
+      - "bait and switch"
+      - "free trial ran out"
+      - "cancelled my subscription because"
+
+matching:
+  case_sensitive: false
+
+# ---------------------------------------------------------------------
+# СЪСТОЯНИЕ (за да не се изпраща едно и също съобщение два пъти)
+# ---------------------------------------------------------------------
+run:
+  state_dir: "state"
+  reddit_seen_file: "state/seen_reddit.json"
+  site_search_seen_file: "state/seen_site_search.json"
+  max_seen_ids_per_source: 5000
+  # За таблото (dashboard.py) — виж раздел "Табло за преглед" в README.md.
+  recent_matches_file: "state/recent_matches.json"
+  recent_matches_keep_hours: 48
+
+# ---------------------------------------------------------------------
+# ТАБЛО ЗА ПРЕГЛЕД (dashboard.py) — ръчно пускан преглед на последните
+# 24 часа релевантни нишки, подредени по сила на съвпадение. НЕ пише
+# и НЕ публикува нищо никъде — само показва и линкова. Черновите на
+# отговори се правят отделно, в чат със skill "reddit-uk-translator".
+# ---------------------------------------------------------------------
+dashboard:
+  window_hours: 24
+  # docs/index.html е нужно за GitHub Pages (Settings -> Pages -> Source:
+  # "Deploy from a branch", Branch: main, Folder: /docs). Виж README.md,
+  # раздел 12.
+  output_file: "docs/index.html"
+  # Тегла за изчисляване на "сила на съвпадение" (relevance score).
+  score_weights:
+    per_keyword_match: 1.0
+    per_idiom_match: 1.5
+    recency_bonus_max: 2.0
