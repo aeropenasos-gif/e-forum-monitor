@@ -1,28 +1,44 @@
 """
 site_search_source.py
 ----------------------
-"Best effort" мониторинг на форуми, които НЯМАТ публично API
-(в момента: Mumsnet, The Student Room).
+ПРЕПРОЕКТИРАН (22.08.2026) — виж Forum-monitor-bot-setup.md за пълния
+контекст на решението. Кратко резюме:
 
-Директно "чукане" на техните собствени search-страници е ненадеждно,
-защото са силно динамични (JavaScript) и подлежат на чести промени.
-Затова използваме DuckDuckGo HTML търсене (https://html.duckduckgo.com/html/)
-с оператор site:<domain>, което е стабилно за просто читане на HTML и
-не изисква API ключ.
+Старата версия правеше keyword search през DuckDuckGo (site:domain
+"фраза") за Mumsnet и The Student Room. Проверка на robots.txt показа,
+че това е несъвместимо с изрично заявените правила на самите сайтове:
 
-ВАЖНО ограничение (обяснено и в README.md):
-    Резултатите зависят от това кога DuckDuckGo е индексирал дадена
-    страница — това може да отнеме от няколко минути до няколко часа.
-    Това НЕ е мониторинг в реално време като при Reddit API, а
-    приблизителен, но полезен "best effort" сигнал.
+  - Mumsnet: "Disallow: /search?query=*" и "Disallow: /api/*" за всички
+    ботове (User-agent: *). Няма съответстващ на правилата начин да се
+    прави keyword search там автоматично.
+  - The Student Room: "Disallow: /search/*" също за всички ботове, НО
+    с една единствена, много точна изключение:
+        Allow: /search.php?filter[type]=thread&sortby=date+desc&filter[date]=[NOW-1DAY+TO+*]
+    т.е. изрично е позволено да се тегли списък с НОВИ нишки от
+    последните 24 часа (без свободен текст по ключова дума).
+  - DuckDuckGo: html.duckduckgo.com/html/, на който разчиташе старият
+    код, също е "Disallow: /html" в собствения robots.txt на DuckDuckGo.
+
+Затова:
+  - Mumsnet вече е ИЗКЛЮЧЕН (enabled: false в config.yaml) — не съществува
+    съответстващ на техните правила начин да теглим ключово търсене
+    оттам с автоматизиран скрипт. Ако в бъдеще се уреди партньорски/
+    платен достъп, тук може да се добави съответна имплементация.
+  - The Student Room вече НЕ се пита с ключова фраза през DuckDuckGo.
+    Вместо това теглим широкия, изрично позволен списък с нови нишки
+    (endpoint по-долу) и прилагаме ЛОКАЛНО нашия matcher.py върху
+    заглавие + форум — точно както прави reddit_source.py: тегли
+    широко, филтрира локално. Това е едновременно по-съобразено с
+    правилата И по-бързо (сървърно рендиран HTML, без блокиране,
+    без нужда от JavaScript, обновява се на минути, не на часове).
 """
 
-import random
-import time
+import re
+from datetime import datetime, timedelta, timezone
+
 import requests
 from bs4 import BeautifulSoup
 
-DUCKDUCKGO_HTML_URL = "https://html.duckduckgo.com/html/"
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (compatible; EForumMonitor/1.0; "
@@ -30,136 +46,137 @@ HEADERS = {
     )
 }
 
+# Изрично позволеният endpoint в robots.txt на The Student Room:
+# Allow: /search.php?filter[type]=thread&sortby=date+desc&filter[date]=[NOW-1DAY+TO+*]
+TSR_RECENT_THREADS_URL = "https://www.thestudentroom.co.uk/search.php"
+TSR_RECENT_THREADS_PARAMS = {
+    "filter[type]": "thread",
+    "sortby": "date desc",
+    "filter[date]": "[NOW-1DAY TO *]",
+}
 
-def _chunk(items, size):
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
+_RELATIVE_TIME_RE = re.compile(
+    r"(\d+)\s+(second|minute|hour|day)s?\s+ago", re.IGNORECASE
+)
 
 
-def _search_duckduckgo(query: str):
+def _parse_relative_time(text: str, now: datetime):
     """
-    Изпраща едно търсене към DuckDuckGo HTML endpoint и връща списък от
-    (url, title, snippet).
-
-    ДИАГНОСТИЧЕН РЕЖИМ (временно, за да установим защо Mumsnet/TSR дават
-    системно 0 резултата): логваме HTTP статус, дължина на отговора и
-    дали открихме анти-бот/anomaly маркери, дори когато заявката
-    технически "успее" (status 200) — защото DuckDuckGo е известен с
-    връщане на празна/интерстициална страница вместо грешка при заявки
-    от datacenter/споделени IP-та (напр. GitHub Actions runners).
+    Превръща "6 minutes ago" / "2 hours ago" / "1 day ago" в приблизителен
+    datetime. The Student Room не дава абсолютен timestamp в HTML-а на
+    списъка (само относително време), затова това си остава приблизително
+    — маркираме го изрично с created_at_is_approximate=True надолу.
+    Връща None, ако текстът не се разпознае (напр. "Yesterday, 14:32" —
+    рядък edge case при по-стари нишки на по-късни страници).
     """
+    match = _RELATIVE_TIME_RE.search(text or "")
+    if not match:
+        return None
+    amount = int(match.group(1))
+    unit = match.group(2).lower()
+    delta = {
+        "second": timedelta(seconds=amount),
+        "minute": timedelta(minutes=amount),
+        "hour": timedelta(hours=amount),
+        "day": timedelta(days=amount),
+    }[unit]
+    return now - delta
+
+
+def _fetch_tsr_recent_threads_page(page: int):
+    """
+    Тегли ЕДНА страница (20 нишки) от изрично позволения "нови нишки от
+    последните 24ч" списък на The Student Room. Връща списък от речници
+    със суров текст за локално сравнение с ключовите думи/идиоми.
+    """
+    params = dict(TSR_RECENT_THREADS_PARAMS)
+    if page > 1:
+        params["page"] = page
+
     try:
-        response = requests.post(
-            DUCKDUCKGO_HTML_URL,
-            data={"q": query},
+        response = requests.get(
+            TSR_RECENT_THREADS_URL,
+            params=params,
             headers=HEADERS,
             timeout=20,
         )
         print(
-            f"[site_search][DEBUG] query={query!r} status={response.status_code} "
-            f"resp_len={len(response.text)}"
+            f"[site_search][DEBUG] TSR recent-threads page={page} "
+            f"status={response.status_code} resp_len={len(response.text)}"
         )
         response.raise_for_status()
     except requests.RequestException as exc:
-        print(f"[site_search] Грешка при заявка към DuckDuckGo: {exc}")
+        print(f"[site_search] Грешка при заявка към The Student Room: {exc}")
         return []
 
-    lowered = response.text.lower()
-    anomaly_markers = ["anomaly", "unusual traffic", "are you a robot", "captcha", "blocked"]
-    hit_markers = [m for m in anomaly_markers if m in lowered]
-    if hit_markers:
-        print(
-            f"[site_search][DEBUG] Открити анти-бот маркери в отговора: {hit_markers} "
-            f"— DuckDuckGo вероятно блокира/предизвиква тази заявка, не връща реални резултати."
-        )
-
     soup = BeautifulSoup(response.text, "lxml")
-    result_nodes = soup.select(".result")
-    print(f"[site_search][DEBUG] .result елементи в HTML: {len(result_nodes)}")
-    if not result_nodes:
-        # Отпечатваме първите символи от отговора (без чувствителни данни),
-        # за да видим какво реално сме получили — блокираща страница,
-        # различна HTML структура, или наистина "без резултати".
-        snippet_preview = response.text[:500].replace("\n", " ")
-        print(f"[site_search][DEBUG] Преглед на празния отговор (първите 500 симв.): {snippet_preview!r}")
+    thread_links = soup.select('a[href^="showthread.php?t="]')
+    print(f"[site_search][DEBUG] TSR намерени нишки на страница {page}: {len(thread_links)}")
 
+    now = datetime.now(timezone.utc)
     results = []
-    for result in result_nodes:
-        link_tag = result.select_one(".result__a")
-        snippet_tag = result.select_one(".result__snippet")
-        if not link_tag or not link_tag.get("href"):
+    for link in thread_links:
+        row = link.find_parent("tr")
+        if row is None:
             continue
-        url = link_tag["href"]
-        title = link_tag.get_text(strip=True)
-        snippet = snippet_tag.get_text(strip=True) if snippet_tag else ""
-        results.append((url, title, snippet))
+
+        thread_id = link.get("href", "")
+        title = link.get_text(strip=True)
+
+        forum_link = row.select_one('a[href^="forumdisplay.php?f="]')
+        forum_name = forum_link.get_text(strip=True) if forum_link else ""
+
+        # Клетката с "smallfont" съдържа последния постващ + относително
+        # време (напр. "started by: X" е в друга клетка; тук е "last post").
+        time_cell = row.select_one("td.smallfont, td.alt2.smallfont")
+        relative_time_text = time_cell.get_text(" ", strip=True) if time_cell else ""
+        approx_time = _parse_relative_time(relative_time_text, now)
+
+        thread_url = f"https://www.thestudentroom.co.uk/{thread_id}"
+        results.append(
+            {
+                "id": thread_url,
+                "url": thread_url,
+                "text": f"{title}\n{forum_name}",
+                "source_label": "The Student Room",
+                "created_at": (approx_time or now).timestamp(),
+                # Това е час на последна активност (не на създаване на
+                # нишката), и е приблизителен (само относителен текст в
+                # HTML-а, не абсолютен timestamp) — затова изрично true.
+                "created_at_is_approximate": True,
+            }
+        )
     return results
 
 
 def fetch_new_items(site_search_cfg: dict, search_terms):
     """
-    Генератор, който за всеки активен сайт (mumsnet, studentroom, ...)
-    прави групирани DuckDuckGo заявки за всички ключови фрази и връща:
-        {
-            "id": "<url на резултата>",
-            "url": "<url>",
-            "text": "<заглавие + snippet>",
-            "source_label": "<Mumsnet / The Student Room>",
-        }
+    Генератор за "best effort" форуми без официално API. Единственият
+    активен източник тук в момента е The Student Room (виж модулния
+    docstring по-горе защо Mumsnet е изключен и защо вече не се ползва
+    DuckDuckGo).
+
+    `search_terms` се приема заради обратна съвместимост с main.py, но
+    вече НЕ се използва — не строим keyword-заявка към трета страна;
+    вместо това връщаме широк списък от нови нишки, а `matcher.py`
+    прави съвпадението локално (същия принцип като при reddit_source.py).
     """
-    if not search_terms:
+    studentroom_cfg = (site_search_cfg or {}).get("studentroom", {}) or {}
+    mumsnet_cfg = (site_search_cfg or {}).get("mumsnet", {}) or {}
+
+    if mumsnet_cfg.get("enabled"):
+        print(
+            "[site_search] ПРЕДУПРЕЖДЕНИЕ: mumsnet.enabled=true в config.yaml, "
+            "но Mumsnet's robots.txt забранява /search и /api/ за автоматизирани "
+            "клиенти — няма имплементация, която да спазва това правило. "
+            "Пропускам Mumsnet. Виж Forum-monitor-bot-setup.md, актуализация "
+            "22.08.2026."
+        )
+
+    if not studentroom_cfg.get("enabled"):
         return
 
-    batch_size = int(site_search_cfg.get("batch_size", 8))
-
-    # 21.08.2026: DEBUG логовете потвърдиха диагнозата — DuckDuckGo пуска
-    # ПЪРВАТА заявка към даден домейн в цикъла с реални резултати, а на
-    # всяка следваща (към същия домейн) отговаря с интерстициалната си
-    # страница "Protection. Privacy. Peace of mind." вместо резултати.
-    # Старата пауза от 1.5 сек между заявките очевидно не е достатъчна.
-    # Затова минимумът/максимумът вече са конфигурируеми и много по-големи
-    # по подразбиране, с произволна пауза (jitter) между тях, за да не
-    # приличаме на автоматизиран скрейпър с фиксиран ритъм.
-    delay_min = site_search_cfg.get("delay_between_requests_min")
-    delay_max = site_search_cfg.get("delay_between_requests_max")
-    if delay_min is None or delay_max is None:
-        # Обратна съвместимост със стария единичен ключ, ако някой все
-        # още го е задал в config.yaml.
-        legacy_delay = float(site_search_cfg.get("delay_between_requests", 15.0))
-        delay_min = legacy_delay
-        delay_max = legacy_delay
-    delay_min = float(delay_min)
-    delay_max = float(delay_max)
-
-    sites = {
-        key: value
-        for key, value in site_search_cfg.items()
-        if isinstance(value, dict) and value.get("enabled")
-    }
-
-    for _site_key, site_cfg in sites.items():
-        domain = site_cfg.get("domain")
-        label = site_cfg.get("label", domain)
-        if not domain:
-            continue
-
-        for batch in _chunk(search_terms, batch_size):
-            quoted_terms = [f'"{term}"' for term in batch]
-            query = f"site:{domain} (" + " OR ".join(quoted_terms) + ")"
-            results = _search_duckduckgo(query)
-
-            for url, title, snippet in results:
-                yield {
-                    "id": url,
-                    "url": url,
-                    "text": f"{title}\n{snippet}",
-                    "source_label": label,
-                    # DuckDuckGo не ни дава точен момент на публикуване —
-                    # използваме момента на намиране като приблизителна
-                    # стойност и го отбелязваме изрично като такава, за
-                    # да не подвежда таблото за "последните 24 часа".
-                    "created_at": time.time(),
-                    "created_at_is_approximate": True,
-                }
-
-            time.sleep(random.uniform(delay_min, delay_max))
+    pages_per_cycle = int(studentroom_cfg.get("pages_per_cycle", 2))
+    for page in range(1, pages_per_cycle + 1):
+        for item in _fetch_tsr_recent_threads_page(page):
+            yield item
