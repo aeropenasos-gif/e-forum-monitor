@@ -39,6 +39,13 @@ def _search_duckduckgo(query: str):
     """
     Изпраща едно търсене към DuckDuckGo HTML endpoint и връща списък от
     (url, title, snippet).
+
+    ДИАГНОСТИЧЕН РЕЖИМ (временно, за да установим защо Mumsnet/TSR дават
+    системно 0 резултата): логваме HTTP статус, дължина на отговора и
+    дали открихме анти-бот/anomaly маркери, дори когато заявката
+    технически "успее" (status 200) — защото DuckDuckGo е известен с
+    връщане на празна/интерстициална страница вместо грешка при заявки
+    от datacenter/споделени IP-та (напр. GitHub Actions runners).
     """
     try:
         response = requests.post(
@@ -47,14 +54,36 @@ def _search_duckduckgo(query: str):
             headers=HEADERS,
             timeout=20,
         )
+        print(
+            f"[site_search][DEBUG] query={query!r} status={response.status_code} "
+            f"resp_len={len(response.text)}"
+        )
         response.raise_for_status()
     except requests.RequestException as exc:
         print(f"[site_search] Грешка при заявка към DuckDuckGo: {exc}")
         return []
 
+    lowered = response.text.lower()
+    anomaly_markers = ["anomaly", "unusual traffic", "are you a robot", "captcha", "blocked"]
+    hit_markers = [m for m in anomaly_markers if m in lowered]
+    if hit_markers:
+        print(
+            f"[site_search][DEBUG] Открити анти-бот маркери в отговора: {hit_markers} "
+            f"— DuckDuckGo вероятно блокира/предизвиква тази заявка, не връща реални резултати."
+        )
+
     soup = BeautifulSoup(response.text, "lxml")
+    result_nodes = soup.select(".result")
+    print(f"[site_search][DEBUG] .result елементи в HTML: {len(result_nodes)}")
+    if not result_nodes:
+        # Отпечатваме първите символи от отговора (без чувствителни данни),
+        # за да видим какво реално сме получили — блокираща страница,
+        # различна HTML структура, или наистина "без резултати".
+        snippet_preview = response.text[:500].replace("\n", " ")
+        print(f"[site_search][DEBUG] Преглед на празния отговор (първите 500 симв.): {snippet_preview!r}")
+
     results = []
-    for result in soup.select(".result"):
+    for result in result_nodes:
         link_tag = result.select_one(".result__a")
         snippet_tag = result.select_one(".result__snippet")
         if not link_tag or not link_tag.get("href"):
