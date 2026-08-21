@@ -75,7 +75,12 @@ site_search:
     note: "Изключено умишлено — виж README.md, раздел 'Ограничения'."
   # Колко ключови фрази да се групират в една заявка към DuckDuckGo
   # (за да не се правят десетки отделни заявки на всеки цикъл).
-  batch_size: 8
+  # ПРОМЯНА (21.08.2026): вдигнато от 8 на 20, защото новите естествени
+  # фрази почти удвоиха общия брой ключови изрази (~40 -> ~71) — с по-голям
+  # batch_size броят HTTP заявки на цикъл остава подобен на преди, вместо
+  # да нарасне, което би увеличило риска от rate-limit блокиране точно
+  # докато диагностицираме проблема с DuckDuckGo.
+  batch_size: 20
   # Пауза (в секунди) между заявките, за да не се претоварва DuckDuckGo.
   delay_between_requests: 1.5
 
@@ -85,29 +90,27 @@ site_search:
 # Можеш свободно да добавяш/трият редове тук — не е нужна промяна в код.
 # ---------------------------------------------------------------------
 keywords:
+  # ПРОМЯНА (виж бележка от Claude, 21.08.2026): орязан е списъкът с
+  # твърде формални/"брандирани" фрази, които рядко се появяват буквално
+  # в разговорен текст (напр. "Shared Family organizer", "Organize Family
+  # Routines" бяха премахнати) — заместени са с естествени изрази по-долу,
+  # за да не се увеличава общият брой заявки към DuckDuckGo без нужда
+  # (всяка допълнителна фраза = допълнителна заявка = по-висок риск от
+  # rate-limit блокиране, виж диагностиката в site_search_source.py).
   phrases:
     - "Family Organizer"
     - "Family Assistant"
     - "home organizer"
-    - "Family AI"
-    - "to do list"
-    - "to do notes"
     - "Household Organizer"
-    - "Shared Family Calendar"
-    - "Shared Family organizer"
-    - "Organize Family Routines"
     - "Household Assistant"
     - "Family Hub"
     - "shared tasks"
     - "shared calendar"
-    - "shared household organizer"
     - "family app"
     - "family calendar"
-    - "weekly shopping"
     - "online family organiser"
     - "diary app"
     - "calendar sharing app"
-    - "family calendar apps"
     - "shopping list"
 
   # "Интелигентно търсене на асоциации" = групи от английски идиоми/фрази,
@@ -144,6 +147,64 @@ keywords:
       - "automatic reminders for chores"
       - "smart to-do list"
       - "app that reminds you"
+
+    # НОВА ГРУПА (21.08.2026): естествени фрази, които хората пишат, когато
+    # ТЪРСЯТ приложение — по-вероятни за буквално съвпадение от формални
+    # категорийни имена. Потвърдено с реален пример от Reddit (r/ProductivityHQ,
+    # "Best family calendar app that handles school schedules?").
+    app_recommendation_requests:
+      - "what's everyone using for"
+      - "any recommendations for a family calendar"
+      - "does anyone use an app for"
+      - "looking for an app that"
+      - "is there an app that reminds"
+      - "what do you use to keep track of"
+      - "best app for family calendar"
+      - "family calendar recs"
+
+    # НОВА ГРУПА (21.08.2026): реални фрази за изоставяне/фрустрация от
+    # съществуващи приложения — много високо-стойностен сигнал (директно
+    # показва болка, не само намерение за търсене). Взети от реален
+    # Reddit коментар: "The cozi thing dying because one of you stopped
+    # using it is literally every couple ever" и подобни.
+    app_abandonment_and_frustration:
+      - "stopped using it"
+      - "never opened it again"
+      - "downloaded so many apps"
+      - "tried like three different apps"
+      - "got cluttered fast"
+      - "nobody actually uses it"
+
+    # НОВА ГРУПА (21.08.2026): специфични за съквартиранти/споделено жилище
+    # фрази — пряко покриват вече следените subreddit-и (roommates, flatshare,
+    # livingtogether, padsplit, HousingUK, LondonHousing) с по-естествен език
+    # от общите "Family..." фрази, които рядко пасват на тази аудитория.
+    roommate_and_shared_housing:
+      - "splitting chores with roommates"
+      - "chore wheel"
+      - "whose turn is it to clean"
+      - "roommate agreement"
+      - "splitting rent and bills"
+      - "utilities split roommates"
+      - "chore chart for roommates"
+
+    # НОВА ГРУПА (21.08.2026): очаквания за AI/автоматизация — пряко
+    # относими към AI позиционирането на Eligna.
+    ai_and_automation_expectation:
+      - "app that reads your email"
+      - "scan the receipt and add it"
+      - "forward the email and it adds"
+      - "automatically add to calendar"
+      - "why do I have to manually add"
+
+    # НОВА ГРУПА (21.08.2026): ценова еластичност/paywall недоволство —
+    # директно от находките в Consumer Voice доклада (Раздел 8).
+    pricing_and_paywall_natural:
+      - "used to be free and now"
+      - "started charging for"
+      - "bait and switch"
+      - "free trial ran out"
+      - "cancelled my subscription because"
 
 matching:
   case_sensitive: false
